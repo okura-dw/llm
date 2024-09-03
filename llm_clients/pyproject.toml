@@ -1,0 +1,78 @@
+[project]
+name = llm-clients
+version = "2024.09.03"
+dependencies = [
+  "google-generativeai>0.7.2",
+  "openai>1.41.0",
+]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.black]
+line-length = 100
+
+[tool.mypy]
+# https://mypy.readthedocs.io/en/stable/config_file.html
+check_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+allow_redefinition = true
+
+[tool.pyright]
+reportGeneralTypeIssues = "warning"
+reportOptionalSubscript = "warning"
+reportOptionalMemberAccess = "warning"
+reportOptionalCall = "warning"
+reportOptionalIterable = "warning"
+reportOptionalContextManager = "warning"
+reportOptionalOperand = "warning"
+reportUntypedNamedTuple = "warning"
+
+reportMissingTypeStubs = "none"
+reportPrivateImportUsage = "none"
+reportFunctionMemberAccess = "none"
+reportIncompatibleMethodOverride = "none"
+reportIncompatibleVariableOverride = "none"
+reportInconsistentConstructor = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+
+typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+addopts = "--isort --pydocstyle"
+
+[tool.pydocstyle]
+convention = "numpy"
+add_ignore = "D100,D104,D400,D401,D403"
+match_dir = "[^venv]"
+
+##########################################
+[tool.sqlfluff.core]
+# 適宜変えてください。
+dialect = "snowflake"
+exclude_rules = "structure.column_order" # ST06
+max_line_length = 200
+
+[tool.sqlfluff.rules.capitalisation.keywords] # CP01
+capitalisation_policy = "upper"
+
+[tool.sqlfluff.rules.capitalisation.identifiers] # CP02
+capitalisation_policy = "lower"
+
+[tool.sqlfluff.rules.capitalisation.functions] # CP03
+extended_capitalisation_policy = "upper"
+
+[tool.sqlfluff.rules.structure.subquery] # ST05
+forbid_subquery_in = "join"
+
+[tool.sqlfluff.rules.ambiguous.column_references] # AM06
+group_by_and_order_by_style = "explicit"
+
+[tool.sqlfluff.indentation]
+indented_then = false

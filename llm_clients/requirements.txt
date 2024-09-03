@@ -1,0 +1,2 @@
+instructor==1.4.0
+streamlit==1.37.1
