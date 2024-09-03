@@ -1,9 +1,10 @@
 [project]
-name = llm-clients
+name = "llm-clients"
 version = "2024.09.03"
 dependencies = [
-  "google-generativeai>0.7.2",
-  "openai>1.41.0",
+  "google-generativeai>=0.7.2",
+  "openai>=1.41.0",
+  "streamlit>=1.37.1",
 ]
 
 [tool.isort]

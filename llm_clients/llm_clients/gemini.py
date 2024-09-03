@@ -5,11 +5,11 @@ import google.generativeai.models
 import pydantic
 import streamlit
 
-from sandbox import util
+from llm_clients import logger, types
 
 
 def tuple2message(
-    tuple_messages: tuple[util.TupleMessage | util.TupleMessageUser, ...]
+    tuple_messages: tuple[types.TupleMessage | types.TupleMessageUser, ...]
 ) -> list[google.generativeai.types.ContentDict]:
     messages: list[google.generativeai.types.ContentDict] = []
     for tuple_message in tuple_messages:
@@ -64,10 +64,10 @@ def pydantic_to_typed_dict(model: type[pydantic.BaseModel]) -> type[TypedDict]: 
 def _cached_fetch(
     api_key: str,
     model: str,
-    messages: tuple[util.TupleMessage | util.TupleMessageUser, ...],
+    messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
     response_format: type[pydantic.BaseModel],
 ) -> google.generativeai.types.GenerateContentResponse:
-    print("don't use cache")
+    logger.logger.info("don't use cache")
     google.generativeai.configure(api_key=api_key)
     client = google.generativeai.GenerativeModel(model)
 
@@ -95,8 +95,9 @@ class Gemini:
         T: type[pydantic.BaseModel]
     ](
         self,
-        messages: tuple[util.TupleMessage | util.TupleMessageUser, ...],
+        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
         response_format: T,
     ) -> T:
         response = _cached_fetch(self.api_key, self.model, messages, response_format)
+        logger.logger.debug(response)
         return response_format.model_validate_json(response.text)

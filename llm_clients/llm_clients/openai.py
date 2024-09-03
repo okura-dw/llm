@@ -3,11 +3,11 @@ import openai.types.chat
 import pydantic
 import streamlit
 
-from sandbox import util
+from llm_clients import logger, types
 
 
 def tuple2message(
-    tuple_messages: tuple[util.TupleMessage | util.TupleMessageUser, ...]
+    tuple_messages: tuple[types.TupleMessage | types.TupleMessageUser, ...]
 ) -> list[openai.types.chat.ChatCompletionMessageParam]:
     messages: list[openai.types.chat.ChatCompletionMessageParam] = []
     for tuple_message in tuple_messages:
@@ -65,10 +65,10 @@ def _cached_fetch[
 ](
     api_key: str,
     model: str,
-    messages: tuple[util.TupleMessage | util.TupleMessageUser, ...],
+    messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
     response_format: T,
 ) -> openai.types.chat.ParsedChatCompletion[T]:
-    print("don't use cache")
+    logger.logger.info("don't use cache")
     client = openai.OpenAI(api_key=api_key)
 
     return client.beta.chat.completions.parse(
@@ -84,7 +84,7 @@ class OpenAI:
     def fetch[
         T: type[pydantic.BaseModel]
     ](
-        self, messages: tuple[util.TupleMessage | util.TupleMessageUser, ...], response_format: T
+        self, messages: tuple[types.TupleMessage | types.TupleMessageUser, ...], response_format: T
     ) -> (T | None):
         return (
             _cached_fetch(self.api_key, self.model, messages, response_format)

@@ -2,7 +2,7 @@ import openai.types.chat
 import pydantic
 import streamlit
 
-from llm_clients import clients, util
+import llm_clients
 
 
 class Response(pydantic.BaseModel, frozen=True):
@@ -18,7 +18,7 @@ if __name__ == "__main__":
         match model_name:
             case "OpenAI":
                 model = streamlit.selectbox("model", ["gpt-4o-2024-08-06"])
-                llm = clients.OpenAI(api_key, model)  # type: ignore
+                llm = llm_clients.OpenAI(api_key, model)  # type: ignore
             case "Gemini":
                 model = streamlit.selectbox(
                     "model",
@@ -29,7 +29,7 @@ if __name__ == "__main__":
                         "gemini-1.5-flash-8b-exp-0827",
                     ],
                 )
-                llm = clients.Gemini(api_key, model)  # type: ignore
+                llm = llm_clients.Gemini(api_key, model)  # type: ignore
 
             case _:
                 raise ValueError
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         {"role": "user", "content": user_message},
     ]
     if streamlit.button("run"):
-        response = llm.fetch(util.message2tuple(messages), response_format=Response)
+        response = llm.fetch(llm_clients.message2tuple(messages), response_format=Response)
     if response is not None:
         print(response)
         streamlit.write(response.message)
