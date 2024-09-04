@@ -1,3 +1,3 @@
-import streamlit.logger
+import logging
 
-logger = streamlit.logger.get_logger(__name__)
+logger = logging.getLogger("llm-clients")

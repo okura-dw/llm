@@ -59,7 +59,7 @@ def tuple2message(
     return messages
 
 
-@streamlit.cache_resource
+@streamlit.cache_resource(show_spinner=False)
 def _cached_fetch[
     T: type[pydantic.BaseModel]
 ](
@@ -86,8 +86,6 @@ class OpenAI:
     ](
         self, messages: tuple[types.TupleMessage | types.TupleMessageUser, ...], response_format: T
     ) -> (T | None):
-        return (
-            _cached_fetch(self.api_key, self.model, messages, response_format)
-            .choices[0]
-            .message.parsed
-        )
+        response = _cached_fetch(self.api_key, self.model, messages, response_format)
+        logger.logger.debug(response)
+        return response.choices[0].message.parsed

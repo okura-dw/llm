@@ -1,11 +1,12 @@
 [project]
 name = "llm-clients"
-version = "2024.09.03"
-dependencies = [
-  "google-generativeai>=0.7.2",
-  "openai>=1.41.0",
-  "streamlit>=1.37.1",
-]
+version = "2024.09.04"
+dependencies = ["streamlit>=1.37.1"]
+
+[project.optional-dependencies]
+gemini = ["google-generativeai>=0.7.2"]
+openai = ["openai>=1.41.0"]
+whisper = ["faster-whisper>=1.0.3"]
 
 [tool.isort]
 profile = "black"

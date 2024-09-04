@@ -60,7 +60,7 @@ def pydantic_to_typed_dict(model: type[pydantic.BaseModel]) -> type[TypedDict]: 
     return TypedDict(model.__name__ + "Dict", class_dict)  # pyright: ignore
 
 
-@streamlit.cache_resource
+@streamlit.cache_resource(show_spinner=False)
 def _cached_fetch(
     api_key: str,
     model: str,

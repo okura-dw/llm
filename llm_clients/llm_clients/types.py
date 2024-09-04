@@ -14,3 +14,9 @@ class TupleMessageUser(NamedTuple):
 class TupleMessage(NamedTuple):
     role: Literal["assistant", "system", "tool"]
     content: str
+
+
+class Transcript(NamedTuple):
+    start: float
+    end: float
+    text: str
