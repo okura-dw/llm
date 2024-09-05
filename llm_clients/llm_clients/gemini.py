@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, overload
 
 import google.generativeai
 import google.generativeai.models
@@ -65,18 +65,23 @@ def _cached_fetch(
     api_key: str,
     model: str,
     messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-    response_format: type[pydantic.BaseModel],
+    response_format: type[pydantic.BaseModel] | None,
 ) -> google.generativeai.types.GenerateContentResponse:
     logger.logger.info("don't use cache")
     google.generativeai.configure(api_key=api_key)
     client = google.generativeai.GenerativeModel(model)
 
-    return client.generate_content(
-        contents=tuple2message(messages),
-        generation_config=google.generativeai.GenerationConfig(
+    if response_format is not None:
+        generation_config = google.generativeai.GenerationConfig(
             response_mime_type="application/json",
             response_schema=pydantic_to_typed_dict(response_format),  # pyright: ignore
-        ),
+        )
+    else:
+        generation_config = None
+
+    return client.generate_content(
+        contents=tuple2message(messages),
+        generation_config=generation_config,
         safety_settings={
             google.generativeai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: google.generativeai.types.HarmBlockThreshold.BLOCK_NONE,
             google.generativeai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: google.generativeai.types.HarmBlockThreshold.BLOCK_NONE,
@@ -91,13 +96,35 @@ class Gemini:
         self.api_key = api_key
         self.model = model
 
+    @overload
+    def fetch(
+        self,
+        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+        response_format: None,
+    ) -> str: ...
+
+    @overload
+    def fetch(self, messages: tuple[types.TupleMessage | types.TupleMessageUser, ...]) -> str: ...
+
+    @overload
     def fetch[
         T: type[pydantic.BaseModel]
     ](
         self,
         messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
         response_format: T,
-    ) -> T:
+    ) -> T: ...
+
+    def fetch[
+        T: type[pydantic.BaseModel]
+    ](
+        self,
+        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+        response_format: T | None = None,
+    ) -> (T | str):
         response = _cached_fetch(self.api_key, self.model, messages, response_format)
         logger.logger.debug(response)
-        return response_format.model_validate_json(response.text)
+        if response_format is not None:
+            return response_format.model_validate_json(response.text)
+        else:
+            return response.text

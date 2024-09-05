@@ -1,3 +1,5 @@
+from typing import overload
+
 import openai
 import openai.types.chat
 import pydantic
@@ -59,7 +61,16 @@ def tuple2message(
     return messages
 
 
-@streamlit.cache_resource(show_spinner=False)
+@overload
+def _cached_fetch(
+    api_key: str,
+    model: str,
+    messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+    response_format: None,
+) -> openai.types.chat.ChatCompletion: ...
+
+
+@overload
 def _cached_fetch[
     T: type[pydantic.BaseModel]
 ](
@@ -67,13 +78,27 @@ def _cached_fetch[
     model: str,
     messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
     response_format: T,
-) -> openai.types.chat.ParsedChatCompletion[T]:
+) -> openai.types.chat.ParsedChatCompletion[T]: ...
+
+
+@streamlit.cache_resource(show_spinner=False)
+def _cached_fetch[
+    T: type[pydantic.BaseModel]
+](
+    api_key: str,
+    model: str,
+    messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+    response_format: T | None,
+) -> (openai.types.chat.ParsedChatCompletion[T] | openai.types.chat.ChatCompletion):
     logger.logger.info("don't use cache")
     client = openai.OpenAI(api_key=api_key)
 
-    return client.beta.chat.completions.parse(
-        model=model, messages=tuple2message(messages), response_format=response_format
-    )
+    if response_format is not None:
+        return client.beta.chat.completions.parse(
+            model=model, messages=tuple2message(messages), response_format=response_format
+        )
+    else:
+        return client.chat.completions.create(model=model, messages=tuple2message(messages))
 
 
 class OpenAI:
@@ -81,11 +106,37 @@ class OpenAI:
         self.api_key = api_key
         self.model = model
 
+    @overload
+    def fetch(
+        self,
+        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+        response_format: None,
+    ) -> str: ...
+
+    @overload
+    def fetch(self, messages: tuple[types.TupleMessage | types.TupleMessageUser, ...]) -> str: ...
+
+    @overload
     def fetch[
         T: type[pydantic.BaseModel]
     ](
-        self, messages: tuple[types.TupleMessage | types.TupleMessageUser, ...], response_format: T
-    ) -> (T | None):
-        response = _cached_fetch(self.api_key, self.model, messages, response_format)
-        logger.logger.debug(response)
-        return response.choices[0].message.parsed
+        self,
+        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+        response_format: T,
+    ) -> (T | None): ...
+
+    def fetch[
+        T: type[pydantic.BaseModel]
+    ](
+        self,
+        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+        response_format: T | None = None,
+    ) -> (str | T | None):
+        if response_format is not None:
+            response = _cached_fetch(self.api_key, self.model, messages, response_format)
+            logger.logger.debug(response)
+            return response.choices[0].message.parsed
+        else:
+            response = _cached_fetch(self.api_key, self.model, messages, response_format)
+            logger.logger.debug(response)
+            return response.choices[0].message.content
