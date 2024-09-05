@@ -22,7 +22,7 @@ def _transcribe(file_path: str, regex: str) -> list[types.Transcript]:
             for i in range(tokenizer.eot)
             if not any(pattern.fullmatch(c) for c in tokenizer.decode([i]))
         ]
-        + [503663, 50364]
+        + [50363, 50364]
     )
 
     transcipts: list[types.Transcript] = []

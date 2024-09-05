@@ -1,6 +1,6 @@
 [project]
 name = "llm-clients"
-version = "2024.09.04"
+version = "2024.09.05"
 dependencies = ["streamlit>=1.37.1"]
 
 [project.optional-dependencies]
