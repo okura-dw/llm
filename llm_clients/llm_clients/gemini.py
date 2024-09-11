@@ -1,5 +1,7 @@
+import mimetypes
 from typing import TypedDict, overload
 
+import cv2
 import google.generativeai
 import google.generativeai.models
 import pydantic
@@ -95,6 +97,7 @@ class Gemini:
     def __init__(self, api_key: str, model: str = "gemini-1.5-flash") -> None:
         self.api_key = api_key
         self.model = model
+        self.fee = 0.0
 
     @overload
     def fetch(
@@ -124,7 +127,59 @@ class Gemini:
     ) -> (T | str):
         response = _cached_fetch(self.api_key, self.model, messages, response_format)
         logger.logger.debug(response)
+        self.calc_fee(messages, response)
         if response_format is not None:
             return response_format.model_validate_json(response.text)
         else:
             return response.text
+
+    def calc_fee(
+        self,
+        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+        response: google.generativeai.types.GenerateContentResponse,
+    ):
+        if self.model.startswith("gemini-1.5-flash"):
+            input_token_price = 0.00001875 / 1_000
+            output_token_price = 0.000075 / 1_000
+            audio_price = 0.000002
+            image_price = 0.00002
+            video_price = 0.00002
+        elif self.model.startswith("gemini-1.5-pro"):
+            input_token_price = 0.00125 / 1_000
+            output_token_price = 0.00375 / 1_000
+            audio_price = 0.000125
+            image_price = 0.001315
+            video_price = 0.001315
+        else:
+            input_token_price = 0
+            output_token_price = 0
+            audio_price = 0
+            image_price = 0
+            video_price = 0
+
+        for message in messages:
+            if message.role != "user" or isinstance(message.content, str):
+                continue
+            for content in message.content:
+                if content.type == "text":
+                    continue
+                file_type, _ = mimetypes.guess_type(content.content)
+                if file_type is None:
+                    continue
+                if file_type.startswith("audio/"):
+                    cap = cv2.VideoCapture(content.content)
+                    self.fee += (
+                        audio_price * cap.get(cv2.CAP_PROP_FRAME_COUNT) / cap.get(cv2.CAP_PROP_FPS)
+                    )
+                elif file_type.startswith("image/"):
+                    self.fee += image_price
+                elif file_type.startswith("video/"):
+                    cap = cv2.VideoCapture(content.content)
+                    self.fee += (
+                        video_price * cap.get(cv2.CAP_PROP_FRAME_COUNT) / cap.get(cv2.CAP_PROP_FPS)
+                    )
+
+        self.fee += (
+            response.usage_metadata.prompt_token_count * input_token_price
+            + response.usage_metadata.candidates_token_count * output_token_price
+        )

@@ -105,6 +105,7 @@ class OpenAI:
     def __init__(self, api_key: str, model: str = "gpt-4o-2024-08-06") -> None:
         self.api_key = api_key
         self.model = model
+        self.fee = 0.0
 
     @overload
     def fetch(
@@ -135,8 +136,43 @@ class OpenAI:
         if response_format is not None:
             response = _cached_fetch(self.api_key, self.model, messages, response_format)
             logger.logger.debug(response)
+            self.calc_fee(messages, response)
             return response.choices[0].message.parsed
         else:
             response = _cached_fetch(self.api_key, self.model, messages, response_format)
             logger.logger.debug(response)
+            self.calc_fee(messages, response)
             return response.choices[0].message.content
+
+    def calc_fee(
+        self,
+        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+        response: (
+            openai.types.chat.ParsedChatCompletion[pydantic.BaseModel]
+            | openai.types.chat.ChatCompletion
+        ),
+    ):
+        if response.usage is None:
+            return
+
+        if self.model == "gpt-4o-2024-08-06":
+            input_token_price = 2.5 / 1_000_000
+            output_token_price = 10.0 / 1_000_000
+            image_price = 0.000213
+        else:
+            input_token_price = 0
+            output_token_price = 0
+            image_price = 0
+
+        for message in messages:
+            if message.role != "user" or isinstance(message.content, str):
+                continue
+            for content in message.content:
+                if content.type == "text":
+                    continue
+                self.fee += image_price
+
+        self.fee += (
+            response.usage.prompt_tokens * input_token_price
+            + response.usage.completion_tokens * output_token_price
+        )
