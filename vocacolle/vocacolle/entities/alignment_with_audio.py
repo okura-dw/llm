@@ -8,34 +8,28 @@ import pydantic
 from vocacolle import types
 
 PROMPT = """\
-次の音声データの曲にタイムスタンプを付けて、例のようなJSON形式で出力してください。
+次の音声データの曲にタイムスタンプを付けて、例のようなSRT形式で出力してください。
 提示したすべての<歌詞>を一行ずつ出力してください。
 ## 例
-{{
-    "lyrics_list": [
-        {{
-            "start_time": "00:10.003",
-            "end_time": "00:12.455",
-            "lyrics": あいうえお,
-            "lyrics_row": 1
-        }},
-        {{
-            "start_time": "00:12.562",
-            "end_time": "00:16.419",
-            "lyrics": かきくけこ,
-            "lyrics_row": 2
-        }},
-        {{
-            "start_time": "01:02.110",
-            "end_time": "01:08.978",
-            "lyrics": さしすせそ,
-            "lyrics_row": 3
-        }}
-    ]
-}}
+1
+00:00:10.003 --> 00:00:12.455
+あいうえお
+2
+00:00:12.562 --> 00:00:16.419
+かきくけこ
+3
+00:01:02.110 --> 00:01:08.978
+さしすせそ
 
 「歌詞」
 {lyrics}
+"""
+
+JSON_PROMPT = """\
+次のSRT形式のデータを、JSONに整形してください。
+
+「SRT形式のデータ」
+{srt}
 """
 
 
@@ -75,10 +69,13 @@ class AlignmentWithAudio:
         ]
 
         response = self.llm.fetch(llm_clients.message2tuple(self.messages))
-        response_json = re.search(r"{.*}", response, flags=re.DOTALL)
-        if response_json is None:
-            raise ValueError(f"Cannot parse response: {response}")
-        response = Response.model_validate_json(response_json.group())
+        print(response)
+        response = self.llm.fetch(
+            llm_clients.message2tuple(
+                [{"role": "user", "content": JSON_PROMPT.format(srt=response)}]
+            ),
+            Response,
+        )
 
         return [
             types.Lyrics(

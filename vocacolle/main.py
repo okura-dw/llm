@@ -10,7 +10,6 @@ import vocacolle
 from vocacolle import entities, types
 
 ROOT_DIR = "downloads"
-USDJPY = 142.16
 
 
 def sec2str(second: int | float | None) -> str:
@@ -62,9 +61,11 @@ def _display(content_id: str, lyrics: str, is_audio_input: bool):
             )
 
     if is_audio_input:
-        output, alignment = streamlit.tabs(["出力", "位置合わせ結果"])
+        output, alignment, fee = streamlit.tabs(["出力", "位置合わせ結果", "料金"])
     else:
-        output, transcript, alignment = streamlit.tabs(["出力", "文字起こし結果", "位置合わせ結果"])
+        output, transcript, alignment, fee = streamlit.tabs(
+            ["出力", "文字起こし結果", "位置合わせ結果", "料金"]
+        )
 
     with output:
         if f"output_{content_id}" in streamlit.session_state:
@@ -92,8 +93,22 @@ def _display(content_id: str, lyrics: str, is_audio_input: bool):
                         streamlit.code(message["content"])
             write_srt(streamlit.session_state[f"alignment_{content_id}"][0], lyrics_list)
 
+    with fee:
+        if f"fee_{content_id}" in streamlit.session_state:
+            usd_jpy = float(streamlit.text_input("USD/JPY", value=150))  # pyright: ignore
+
+            table_str = "処理 | 料金\n" "--- | ---\n"
+            sum_fee = 0
+            for process, usd_fee in streamlit.session_state[f"fee_{content_id}"].items():
+                jpy_fee = usd_fee * usd_jpy
+                sum_fee += jpy_fee
+                table_str += f"{process} | ¥{round(jpy_fee,3)}\n"
+            table_str += f"計 | ¥{round(sum_fee,3)}\n"
+            streamlit.write(table_str)
+
 
 def _run(api_key: str, model: str, content_id: str, lyrics: str, is_audio_input: bool):
+    fee_dict: dict[str, float] = {}
     with streamlit.spinner("動画をダウンロード中..."):
         pass
 
@@ -106,7 +121,7 @@ def _run(api_key: str, model: str, content_id: str, lyrics: str, is_audio_input:
             alignment_audio = entities.AlignmentWithAudio(api_key=api_key, model=model)
             alignment_lyrics = alignment_audio.run(lyrics, audio_path)
             alignment_messages = alignment_audio.messages
-            print(f"¥{alignment_audio.llm.fee * USDJPY}")
+            fee_dict["位置合わせ"] = alignment_audio.llm.fee
 
     else:
         with streamlit.spinner("文字起こし中..."):
@@ -128,6 +143,7 @@ def _run(api_key: str, model: str, content_id: str, lyrics: str, is_audio_input:
         pass
 
     streamlit.session_state[f"output_{content_id}"] = alignment_lyrics
+    streamlit.session_state[f"fee_{content_id}"] = fee_dict
 
 
 if __name__ == "__main__":
