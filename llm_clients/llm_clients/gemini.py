@@ -1,10 +1,10 @@
 import mimetypes
 from typing import TypedDict, overload
 
-import cv2
 import google.generativeai
 import google.generativeai.models
 import pydantic
+import pydub
 import streamlit
 
 from llm_clients import logger, types
@@ -167,16 +167,14 @@ class Gemini:
                 if file_type is None:
                     continue
                 if file_type.startswith("audio/"):
-                    cap = cv2.VideoCapture(content.content)
                     self.fee += (
-                        audio_price * cap.get(cv2.CAP_PROP_FRAME_COUNT) / cap.get(cv2.CAP_PROP_FPS)
+                        audio_price * pydub.AudioSegment.from_file(content.content).duration_seconds
                     )
                 elif file_type.startswith("image/"):
                     self.fee += image_price
                 elif file_type.startswith("video/"):
-                    cap = cv2.VideoCapture(content.content)
                     self.fee += (
-                        video_price * cap.get(cv2.CAP_PROP_FRAME_COUNT) / cap.get(cv2.CAP_PROP_FPS)
+                        video_price * pydub.AudioSegment.from_file(content.content).duration_seconds
                     )
 
         self.fee += (
