@@ -23,6 +23,14 @@ class SplittedFile:
 
 @streamlit.cache_resource(show_spinner=False)
 def _vad_split(audio_path: str, vocal_path: str) -> list[SplittedFile]:
+    """VADフィルターを実行し、分割した秒数とファイル名を返す
+    キャッシュがある場合はキャッシュを返す
+
+    Parameters
+    ----------
+    audio_path
+    vocal_path
+    """
     dir_path, _ = os.path.splitext(audio_path)
     if not os.path.isdir(dir_path):
         os.makedirs(dir_path)
@@ -51,6 +59,19 @@ def _vad_split(audio_path: str, vocal_path: str) -> list[SplittedFile]:
 def _transcribe(
     audio_path: str, vocal_path: str, regex: str, model_name: str, use_vad: bool
 ) -> list[types.Transcript]:
+    """Whisper を実行する
+    キャッシュがある場合はキャッシュを返す
+
+    Parameters
+    ----------
+    audio_path
+    vocal_path
+    regex
+        正規表現 Whisper から生成される文字を制限する
+    model_name
+    use_vad
+        VADフィルターを使うかどうか
+    """
     progress_bar = streamlit.progress(0)
 
     model = faster_whisper.WhisperModel(model_name, compute_type="float32")
@@ -105,10 +126,34 @@ def _transcribe(
 
 
 class Whisper:
+    """Whisper client
+
+    Attributes
+    ----------
+    regex
+    """
+
     def __init__(self, regex: str = "[a-zA-Zぁ-んァ-ン！？ ]+"):
+        """init
+
+        Parameters
+        ----------
+        regex
+            正規表現 Whisper から生成される文字を制限する
+        """
         self.regex = regex
 
     def transcribe(
         self, audio_path: str, vocal_path: str, model_name: str = "large-v2", use_vad: bool = True
     ) -> list[types.Transcript]:
+        """run
+
+        Parameters
+        ----------
+        audio_path
+        vocal_path
+        model_name
+        use_vad
+            VADフィルターを使うかどうか
+        """
         return _transcribe(audio_path, vocal_path, self.regex, model_name, use_vad)

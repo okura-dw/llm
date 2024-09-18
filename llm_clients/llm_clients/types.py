@@ -11,9 +11,22 @@ class TupleMessageUser(NamedTuple):
     content: str | tuple[TupleContentParam, ...]
 
 
-class TupleMessage(NamedTuple):
-    role: Literal["assistant", "system", "tool"]
+class TupleMessageAssistant(NamedTuple):
+    role: Literal["assistant"]
     content: str
+
+
+class TupleMessageSystem(NamedTuple):
+    role: Literal["system"]
+    content: str
+
+
+class TupleMessageTool(NamedTuple):
+    role: Literal["tool"]
+    content: str
+
+
+TupleMessage = TupleMessageUser | TupleMessageAssistant | TupleMessageSystem | TupleMessageTool
 
 
 class Transcript(NamedTuple):

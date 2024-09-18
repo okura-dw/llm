@@ -9,8 +9,14 @@ from llm_clients import logger, types
 
 
 def tuple2message(
-    tuple_messages: tuple[types.TupleMessage | types.TupleMessageUser, ...]
+    tuple_messages: tuple[types.TupleMessage, ...]
 ) -> list[openai.types.chat.ChatCompletionMessageParam]:
+    """types.TupleMessage を OpenAI のメッセージの形式に変換する
+
+    Parameters
+    ----------
+    tuple_messages
+    """
     messages: list[openai.types.chat.ChatCompletionMessageParam] = []
     for tuple_message in tuple_messages:
         match tuple_message.role:
@@ -63,10 +69,7 @@ def tuple2message(
 
 @overload
 def _cached_fetch(
-    api_key: str,
-    model: str,
-    messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-    response_format: None,
+    api_key: str, model: str, messages: tuple[types.TupleMessage, ...], response_format: None
 ) -> openai.types.chat.ChatCompletion: ...
 
 
@@ -74,10 +77,7 @@ def _cached_fetch(
 def _cached_fetch[
     T: type[pydantic.BaseModel]
 ](
-    api_key: str,
-    model: str,
-    messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-    response_format: T,
+    api_key: str, model: str, messages: tuple[types.TupleMessage, ...], response_format: T
 ) -> openai.types.chat.ParsedChatCompletion[T]: ...
 
 
@@ -85,12 +85,19 @@ def _cached_fetch[
 def _cached_fetch[
     T: type[pydantic.BaseModel]
 ](
-    api_key: str,
-    model: str,
-    messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-    response_format: T | None,
+    api_key: str, model: str, messages: tuple[types.TupleMessage, ...], response_format: T | None
 ) -> (openai.types.chat.ParsedChatCompletion[T] | openai.types.chat.ChatCompletion):
-    logger.logger.info("don't use cache")
+    """fetch API
+    キャッシュがある場合はキャッシュを返す
+
+    Parameters
+    ----------
+    api_key
+    model
+    messages
+    response_format
+    """
+    logger.logger.debug("don't use cache")
     client = openai.OpenAI(api_key=api_key)
 
     if response_format is not None:
@@ -102,37 +109,54 @@ def _cached_fetch[
 
 
 class OpenAI:
+    """OpenAI client
+
+    Attributes
+    ----------
+    api_key
+    model
+    fee
+        LLM実行にかかった料金
+    """
+
     def __init__(self, api_key: str, model: str = "gpt-4o-2024-08-06") -> None:
+        """init
+
+        Parameters
+        ----------
+        api_key
+        model
+        """
         self.api_key = api_key
         self.model = model
         self.fee = 0.0
 
     @overload
-    def fetch(
-        self,
-        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-        response_format: None,
-    ) -> str: ...
+    def fetch(self, messages: tuple[types.TupleMessage, ...], response_format: None) -> str: ...
 
     @overload
-    def fetch(self, messages: tuple[types.TupleMessage | types.TupleMessageUser, ...]) -> str: ...
+    def fetch(self, messages: tuple[types.TupleMessage, ...]) -> str: ...
 
     @overload
     def fetch[
         T: type[pydantic.BaseModel]
-    ](
-        self,
-        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-        response_format: T,
-    ) -> (T | None): ...
+    ](self, messages: tuple[types.TupleMessage, ...], response_format: T) -> T | None: ...
 
     def fetch[
         T: type[pydantic.BaseModel]
-    ](
-        self,
-        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-        response_format: T | None = None,
-    ) -> (str | T | None):
+    ](self, messages: tuple[types.TupleMessage, ...], response_format: T | None = None) -> (
+        str | T | None
+    ):
+        """fetch API
+
+        Parameters
+        ----------
+        messages
+        response_format
+            出力の形式を指定したい場合に与える
+            指定した場合はJSONモードで実行し、指示したモデルの形状で返す
+            None の場合は文字列を返す
+        """
         if response_format is not None:
             response = _cached_fetch(self.api_key, self.model, messages, response_format)
             logger.logger.debug(response)
@@ -146,12 +170,19 @@ class OpenAI:
 
     def calc_fee(
         self,
-        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+        messages: tuple[types.TupleMessage, ...],
         response: (
             openai.types.chat.ParsedChatCompletion[pydantic.BaseModel]
             | openai.types.chat.ChatCompletion
         ),
     ):
+        """料金を計算する
+
+        Parameters
+        ----------
+        messages
+        response
+        """
         if response.usage is None:
             return
 

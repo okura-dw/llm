@@ -11,8 +11,14 @@ from llm_clients import logger, types
 
 
 def tuple2message(
-    tuple_messages: tuple[types.TupleMessage | types.TupleMessageUser, ...]
+    tuple_messages: tuple[types.TupleMessage, ...]
 ) -> list[google.generativeai.types.ContentDict]:
+    """types.TupleMessage を Gemini のメッセージの形式に変換する
+
+    Parameters
+    ----------
+    tuple_messages
+    """
     messages: list[google.generativeai.types.ContentDict] = []
     for tuple_message in tuple_messages:
         match tuple_message.role:
@@ -58,6 +64,12 @@ def tuple2message(
 
 
 def pydantic_to_typed_dict(model: type[pydantic.BaseModel]) -> type[TypedDict]:  # pyright: ignore
+    """Gemini の要件に沿うために pydantic.BaseModel を TypedDict 形式に変換する
+
+    Parameters
+    ----------
+    model
+    """
     class_dict = {k: v for k, v in model.__annotations__.items()}
     return TypedDict(model.__name__ + "Dict", class_dict)  # pyright: ignore
 
@@ -66,10 +78,20 @@ def pydantic_to_typed_dict(model: type[pydantic.BaseModel]) -> type[TypedDict]: 
 def _cached_fetch(
     api_key: str,
     model: str,
-    messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+    messages: tuple[types.TupleMessage, ...],
     response_format: type[pydantic.BaseModel] | None,
 ) -> google.generativeai.types.GenerateContentResponse:
-    logger.logger.info("don't use cache")
+    """fetch API
+    キャッシュがある場合はキャッシュを返す
+
+    Parameters
+    ----------
+    api_key
+    model
+    messages
+    response_format
+    """
+    logger.logger.debug("don't use cache")
     google.generativeai.configure(api_key=api_key)
     client = google.generativeai.GenerativeModel(model)
 
@@ -94,37 +116,52 @@ def _cached_fetch(
 
 
 class Gemini:
+    """Gemini client
+
+    Attributes
+    ----------
+    api_key
+    model
+    fee
+        LLM実行にかかった料金
+    """
+
     def __init__(self, api_key: str, model: str = "gemini-1.5-flash") -> None:
+        """init
+
+        Parameters
+        ----------
+        api_key
+        model
+        """
         self.api_key = api_key
         self.model = model
         self.fee = 0.0
 
     @overload
-    def fetch(
-        self,
-        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-        response_format: None,
-    ) -> str: ...
+    def fetch(self, messages: tuple[types.TupleMessage, ...], response_format: None) -> str: ...
 
     @overload
-    def fetch(self, messages: tuple[types.TupleMessage | types.TupleMessageUser, ...]) -> str: ...
+    def fetch(self, messages: tuple[types.TupleMessage, ...]) -> str: ...
 
     @overload
     def fetch[
         T: type[pydantic.BaseModel]
-    ](
-        self,
-        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-        response_format: T,
-    ) -> T: ...
+    ](self, messages: tuple[types.TupleMessage, ...], response_format: T) -> T: ...
 
     def fetch[
         T: type[pydantic.BaseModel]
-    ](
-        self,
-        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
-        response_format: T | None = None,
-    ) -> (T | str):
+    ](self, messages: tuple[types.TupleMessage, ...], response_format: T | None = None) -> T | str:
+        """fetch API
+
+        Parameters
+        ----------
+        messages
+        response_format
+            出力の形式を指定したい場合に与える
+            指定した場合はJSONモードで実行し、指示したモデルの形状で返す
+            None の場合は文字列を返す
+        """
         response = _cached_fetch(self.api_key, self.model, messages, response_format)
         logger.logger.debug(response)
         self.calc_fee(messages, response)
@@ -135,9 +172,16 @@ class Gemini:
 
     def calc_fee(
         self,
-        messages: tuple[types.TupleMessage | types.TupleMessageUser, ...],
+        messages: tuple[types.TupleMessage, ...],
         response: google.generativeai.types.GenerateContentResponse,
     ):
+        """料金を計算する
+
+        Parameters
+        ----------
+        messages
+        response
+        """
         if self.model.startswith("gemini-1.5-flash"):
             input_token_price = 0.00001875 / 1_000
             output_token_price = 0.000075 / 1_000
