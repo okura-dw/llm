@@ -1,3 +1,6 @@
+import os
+
+import demucs.separate
 import openai.types.chat
 
 import llm_clients.types
@@ -42,3 +45,11 @@ def message2tuple(
                     )
                 )
     return tuple(tuple_messages)
+
+
+def vocal_extract(audio_path: str, dirname: str) -> str:
+    audio_fname, _ = os.path.splitext(os.path.basename(audio_path))
+    vocal_path = f"{dirname}/htdemucs/{audio_fname}/vocals.wav"
+    if not os.path.exists(vocal_path):
+        demucs.separate.main(["--two-stems", "vocals", audio_path, "-o", dirname])
+    return vocal_path

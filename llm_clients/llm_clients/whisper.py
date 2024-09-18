@@ -2,7 +2,6 @@ import dataclasses
 import os
 import re
 
-import demucs.separate
 import faster_whisper
 import faster_whisper.audio
 import faster_whisper.tokenizer
@@ -20,14 +19,6 @@ class SplittedFile:
     fname: str
     start: float
     end: float
-
-
-def _vocal_extract(audio_path: str, dirname: str) -> str:
-    audio_fname, _ = os.path.splitext(os.path.basename(audio_path))
-    vocal_path = f"{dirname}/htdemucs/{audio_fname}/vocals.wav"
-    if not os.path.exists(vocal_path):
-        demucs.separate.main(["--two-stems", "vocals", audio_path, "-o", dirname])
-    return vocal_path
 
 
 @streamlit.cache_resource(show_spinner=False)
@@ -58,7 +49,7 @@ def _vad_split(audio_path: str, vocal_path: str) -> list[SplittedFile]:
 
 @streamlit.cache_resource(show_spinner=False)
 def _transcribe(
-    audio_path: str, vocal_path: str, regex: str, model_name: str
+    audio_path: str, vocal_path: str, regex: str, model_name: str, use_vad: bool
 ) -> list[types.Transcript]:
     progress_bar = streamlit.progress(0)
 
@@ -78,11 +69,11 @@ def _transcribe(
         + [50363, 50364]
     )
 
-    splitted_files = _vad_split(audio_path, vocal_path)
     transcipts: list[types.Transcript] = []
-    for i, f in enumerate(splitted_files):
+
+    def transcribe(fname: str, start: float = 0.0):
         segments, _ = model.transcribe(
-            f.fname,
+            fname,
             temperature=0,
             beam_size=10,
             suppress_tokens=tokens,
@@ -94,14 +85,21 @@ def _transcribe(
         for segment in segments:
             transcipts.append(
                 types.Transcript(
-                    start=round(segment.start + f.start, 3),
-                    end=round(segment.end + f.start, 3),
+                    start=round(segment.start + start, 3),
+                    end=round(segment.end + start, 3),
                     text="".join(pattern.findall(segment.text.strip())),
                 )
             )
 
-        progress_bar.progress((i + 1) / len(splitted_files))
-    progress_bar.empty()
+    if use_vad:
+        splitted_files = _vad_split(audio_path, vocal_path)
+        for i, f in enumerate(splitted_files):
+            transcribe(f.fname, f.start)
+            progress_bar.progress((i + 1) / len(splitted_files))
+        progress_bar.empty()
+
+    else:
+        transcribe(audio_path)
 
     return transcipts
 
@@ -111,13 +109,6 @@ class Whisper:
         self.regex = regex
 
     def transcribe(
-        self,
-        audio_path: str,
-        use_vocal: bool = False,
-        vocal_dirname: str = "./",
-        model_name: str = "large-v2",
+        self, audio_path: str, vocal_path: str, model_name: str = "large-v2", use_vad: bool = True
     ) -> list[types.Transcript]:
-        vocal_path = _vocal_extract(audio_path, vocal_dirname)
-        if use_vocal:
-            audio_path = vocal_path
-        return _transcribe(audio_path, vocal_path, self.regex, model_name)
+        return _transcribe(audio_path, vocal_path, self.regex, model_name, use_vad)
