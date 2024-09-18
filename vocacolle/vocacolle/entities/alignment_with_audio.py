@@ -9,16 +9,16 @@ from vocacolle import types
 
 PROMPT = """\
 次の音声データの曲にタイムスタンプを付けて、例のようなSRT形式で出力してください。
-提示したすべての<歌詞>を一行ずつ出力してください。
+提示したすべての「歌詞」を一行ずつ出力してください。
 ## 例
 1
-00:00:10.003 --> 00:00:12.455
+00:00:10,003 --> 00:00:12,455
 あいうえお
 2
-00:00:12.562 --> 00:00:16.419
+00:00:12,562 --> 00:00:16,419
 かきくけこ
 3
-00:01:02.110 --> 00:01:08.978
+00:01:02,110 --> 00:01:08,978
 さしすせそ
 
 「歌詞」
@@ -52,6 +52,17 @@ class AlignmentWithAudio:
         else:
             raise ValueError
 
+    def fetch(self) -> type[Response]:
+        response = self.llm.fetch(llm_clients.message2tuple(self.messages))
+        self.messages.append({"role": "assistant", "content": response})
+        response = self.llm.fetch(
+            llm_clients.message2tuple(
+                [{"role": "user", "content": JSON_PROMPT.format(srt=response)}]
+            ),
+            Response,
+        )
+        return response
+
     def run(self, lyrics: str, audio_path: str) -> list[types.Lyrics]:
         lyrics_list = [l for l in lyrics.split("\n") if re.sub(r"^\s+$", "", l) != ""]
 
@@ -68,14 +79,7 @@ class AlignmentWithAudio:
             },
         ]
 
-        response = self.llm.fetch(llm_clients.message2tuple(self.messages))
-        print(response)
-        response = self.llm.fetch(
-            llm_clients.message2tuple(
-                [{"role": "user", "content": JSON_PROMPT.format(srt=response)}]
-            ),
-            Response,
-        )
+        response = self.fetch()
 
         return [
             types.Lyrics(
@@ -93,18 +97,18 @@ class AlignmentWithAudio:
         Parameters
         ----------
         second_str
-            xx:xx:xx.xxx 形式の文字列
+            xx:xx:xx.xxx または xx:xx:xx,xxx 形式の文字列
         """
-        nums = second_str.split(":")
+        nums = second_str.replace(",", ".").split(":")
         return sum(float(n) * (60**i) for i, n in enumerate(reversed(nums)))
 
     @staticmethod
     def _lyrics2str(lyrics: list[str]) -> str:
         i = 1
-        lyrics_str = "行番号. 歌詞\n"
+        lyrics_str = ""
         for lyric in lyrics:
             if re.sub(r"^\s+$", "", lyric) != "":
-                lyrics_str += f"{i}. {lyric}\n"
+                lyrics_str += f"{i}\n{lyric}\n"
                 i += 1
             else:
                 lyrics_str += "\n"

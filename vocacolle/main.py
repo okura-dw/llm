@@ -51,7 +51,7 @@ def write_srt(lyrics_list: list[types.Lyrics], prev_lyrics_list: list[types.Lyri
     streamlit.write(texts_str, unsafe_allow_html=True)
 
 
-def _display(content_id: str, lyrics: str, is_audio_input: bool):
+def _display(content_id: str, lyrics: str, is_audio_input: bool, use_vocal: bool, use_vad: bool):
     i = 0
     lyrics_list: list[types.Lyrics] = []
     for lyric in lyrics.split("\n"):
@@ -68,38 +68,43 @@ def _display(content_id: str, lyrics: str, is_audio_input: bool):
         )
 
     with output:
-        if f"output_{content_id}" in streamlit.session_state:
-            write_srt(streamlit.session_state[f"output_{content_id}"])
+        if f"output_{content_id}_{is_audio_input}_{use_vocal}" in streamlit.session_state:
+            write_srt(streamlit.session_state[f"output_{content_id}_{is_audio_input}_{use_vocal}"])
 
     if not is_audio_input:
         with transcript:  # pyright: ignore
-            if f"transcripts_{content_id}" in streamlit.session_state:
+            if f"transcripts_{content_id}_{use_vocal}" in streamlit.session_state:
                 transcripts: list[llm_clients.types.Transcript] = streamlit.session_state[
-                    f"transcripts_{content_id}"
+                    f"transcripts_{content_id}_{use_vocal}"
                 ]
                 transcripts_str = "\n\n".join(f"{t.start} - {t.end}: {t.text}" for t in transcripts)
                 streamlit.write(transcripts_str, unsafe_allow_html=True)
 
     with alignment:
-        if f"alignment_{content_id}" in streamlit.session_state:
+        if f"alignment_{content_id}_{is_audio_input}_{use_vocal}" in streamlit.session_state:
             with streamlit.expander("プロンプト"):
                 messages: list[openai.types.chat.ChatCompletionMessageParam] = (
-                    streamlit.session_state[f"alignment_{content_id}"][1]
+                    streamlit.session_state[f"alignment_{content_id}_{is_audio_input}_{use_vocal}"][
+                        1
+                    ]
                 )
                 for message in messages:
-                    if message["role"] == "system" or (
-                        message["role"] == "user" and isinstance(message["content"], str)
-                    ):
-                        streamlit.code(message["content"])
-            write_srt(streamlit.session_state[f"alignment_{content_id}"][0], lyrics_list)
+                    if not message["role"] == "user" or isinstance(message["content"], str):
+                        streamlit.code(message["content"])  # pyright: ignore
+            write_srt(
+                streamlit.session_state[f"alignment_{content_id}_{is_audio_input}_{use_vocal}"][0],
+                lyrics_list,
+            )
 
     with fee:
-        if f"fee_{content_id}" in streamlit.session_state:
+        if f"fee_{content_id}_{is_audio_input}_{use_vocal}" in streamlit.session_state:
             usd_jpy = float(streamlit.text_input("USD/JPY", value=150))  # pyright: ignore
 
             table_str = "処理 | 料金\n" "--- | ---\n"
             sum_fee = 0
-            for process, usd_fee in streamlit.session_state[f"fee_{content_id}"].items():
+            for process, usd_fee in streamlit.session_state[
+                f"fee_{content_id}_{is_audio_input}_{use_vocal}"
+            ].items():
                 jpy_fee = usd_fee * usd_jpy
                 sum_fee += jpy_fee
                 table_str += f"{process} | ¥{round(jpy_fee,3)}\n"
@@ -107,34 +112,47 @@ def _display(content_id: str, lyrics: str, is_audio_input: bool):
             streamlit.write(table_str)
 
 
-def _run(api_key: str, model: str, content_id: str, lyrics: str, is_audio_input: bool):
+def _run(
+    api_key: str,
+    model: str,
+    content_id: str,
+    lyrics: str,
+    is_audio_input: bool,
+    use_vocal: bool,
+    use_vad: bool,
+):
     fee_dict: dict[str, float] = {}
     with streamlit.spinner("動画をダウンロード中..."):
         pass
 
-    audio_path = f"{ROOT_DIR}/{content_id}.wav"
-    audio_path = "downloads/Kienai_natuno_kaori_Remix_free_ver.mp3"
+    audio_path = f"{ROOT_DIR}/music/{content_id}.mp3"
     streamlit.audio(audio_path)
+    vocal_path = llm_clients.vocal_extract(audio_path, ROOT_DIR)
 
     if is_audio_input:
         with streamlit.spinner("位置合わせ中..."):
             alignment_audio = entities.AlignmentWithAudio(api_key=api_key, model=model)
-            alignment_lyrics = alignment_audio.run(lyrics, audio_path)
+            alignment_lyrics = alignment_audio.run(lyrics, vocal_path if use_vocal else audio_path)
             alignment_messages = alignment_audio.messages
             fee_dict["位置合わせ"] = alignment_audio.llm.fee
 
     else:
         with streamlit.spinner("文字起こし中..."):
             whisper = llm_clients.Whisper()
-            transcripts = whisper.transcribe(audio_path)
-            streamlit.session_state[f"transcripts_{content_id}"] = transcripts
+            transcripts = whisper.transcribe(
+                vocal_path if use_vocal else audio_path, vocal_path, use_vad=use_vad
+            )
+            streamlit.session_state[f"transcripts_{content_id}_{use_vocal}"] = transcripts
 
         with streamlit.spinner("位置合わせ中..."):
             alignment = entities.Alignment(api_key=api_key, model=model)
             alignment_lyrics = alignment.run(lyrics, transcripts)
             alignment_messages = alignment.messages
 
-    streamlit.session_state[f"alignment_{content_id}"] = alignment_lyrics, alignment_messages
+    streamlit.session_state[f"alignment_{content_id}_{is_audio_input}_{use_vocal}"] = (
+        alignment_lyrics,
+        alignment_messages,
+    )
 
     with streamlit.spinner("LLMで補間中..."):
         pass
@@ -142,8 +160,8 @@ def _run(api_key: str, model: str, content_id: str, lyrics: str, is_audio_input:
     with streamlit.spinner("線形補間中..."):
         pass
 
-    streamlit.session_state[f"output_{content_id}"] = alignment_lyrics
-    streamlit.session_state[f"fee_{content_id}"] = fee_dict
+    streamlit.session_state[f"output_{content_id}_{is_audio_input}_{use_vocal}"] = alignment_lyrics
+    streamlit.session_state[f"fee_{content_id}_{is_audio_input}_{use_vocal}"] = fee_dict
 
 
 if __name__ == "__main__":
@@ -160,6 +178,7 @@ if __name__ == "__main__":
                 model = streamlit.selectbox("model", ["gpt-4o-2024-08-06"])
                 llm = llm_clients.OpenAI(api_key, model)
                 is_audio_input = False
+                use_vad = streamlit.checkbox("VADフィルターを使う")
             case "Gemini":
                 model = streamlit.selectbox(
                     "model",
@@ -172,14 +191,20 @@ if __name__ == "__main__":
                 )
                 llm = llm_clients.Gemini(api_key, model)
                 is_audio_input = streamlit.checkbox("音声ファイルを入力する")
+                use_vad = False
 
             case _:
                 raise ValueError
 
-    content_id = streamlit.text_input("content_id")
-    lyrics = streamlit.text_area("歌詞")
+        use_vocal = streamlit.checkbox("ボーカル抽出")
+
+    content_id = streamlit.selectbox("曲", ["何時か見た無名のレーサー", "消えない夏の香り"])
+    with open(f"{ROOT_DIR}/lyrics/{content_id}.txt") as f:
+        lyrics = f.read()
+    with streamlit.expander("歌詞"):
+        streamlit.code(lyrics)
 
     if streamlit.button("run"):
-        _run(api_key, model, content_id, lyrics, is_audio_input)
+        _run(api_key, model, content_id, lyrics, is_audio_input, use_vocal, use_vad)
 
-    _display(content_id, lyrics, is_audio_input)
+    _display(content_id, lyrics, is_audio_input, use_vocal, use_vad)
