@@ -1,1 +1,1 @@
-../llm_clients[openai, gemini, whisper]
+../llm_clients[gemini]

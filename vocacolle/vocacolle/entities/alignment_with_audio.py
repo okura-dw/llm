@@ -1,8 +1,7 @@
 import re
 
-import llm_clients
-import llm_clients.whisper
-import openai.types.chat
+import llm_clients.gemini
+import llm_clients.types
 import pydantic
 
 from vocacolle import types
@@ -45,38 +44,65 @@ class Response(pydantic.BaseModel, frozen=True):
 
 
 class AlignmentWithAudio:
+    """音声ファイルを入力して歌詞にタイムスタンプをつける
+
+    Attributes
+    ----------
+    messages
+    llm
+    """
+
     def __init__(self, api_key: str, model: str):
-        self.messages: list[openai.types.chat.ChatCompletionMessageParam] = []
+        """init
+
+        Parameters
+        ----------
+        api_key
+        model
+        """
+        self.messages: list[llm_clients.types.TupleMessage] = []
         if model.startswith("gemini"):
-            self.llm = llm_clients.Gemini(api_key, model)
+            self.llm = llm_clients.gemini.Gemini(api_key, model)
         else:
             raise ValueError
 
     def fetch(self) -> type[Response]:
-        response = self.llm.fetch(llm_clients.message2tuple(self.messages))
-        self.messages.append({"role": "assistant", "content": response})
+        """fetch 一度文字列でタイムスタンプをつけた後にJSONに成形する"""
+        response = self.llm.fetch(tuple(self.messages))
+        self.messages.append(
+            llm_clients.types.TupleMessageAssistant(role="assistant", content=response)
+        )
         response = self.llm.fetch(
-            llm_clients.message2tuple(
-                [{"role": "user", "content": JSON_PROMPT.format(srt=response)}]
+            (
+                llm_clients.types.TupleMessageUser(
+                    role="user", content=JSON_PROMPT.format(srt=response)
+                ),
             ),
             Response,
         )
         return response
 
     def run(self, lyrics: str, audio_path: str) -> list[types.Lyrics]:
+        """実行
+
+        Parameters
+        ----------
+        lyrics
+        audio_path
+        """
         lyrics_list = [l for l in lyrics.split("\n") if re.sub(r"^\s+$", "", l) != ""]
 
         self.messages = [
-            {
-                "role": "user",
-                "content": PROMPT.format(lyrics=self._lyrics2str(lyrics_list)),
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": audio_path, "detail": "auto"}}
-                ],
-            },
+            llm_clients.types.TupleMessageUser(
+                role="user",
+                content=PROMPT.format(lyrics=self._lyrics2str(lyrics_list)),
+            ),
+            llm_clients.types.TupleMessageUser(
+                role="user",
+                content=(
+                    llm_clients.types.TupleContentParam(type="image_url", content=audio_path),
+                ),
+            ),
         ]
 
         response = self.fetch()
@@ -93,7 +119,8 @@ class AlignmentWithAudio:
 
     @staticmethod
     def _str2sec(second_str: str) -> float:
-        """
+        """xx:xx:xx.xxx または xx:xx:xx,xxx 形式の文字列を秒に変換する
+
         Parameters
         ----------
         second_str
@@ -104,6 +131,12 @@ class AlignmentWithAudio:
 
     @staticmethod
     def _lyrics2str(lyrics: list[str]) -> str:
+        """歌詞のリストを行番号つきの文字列に変換する
+
+        Parameters
+        ----------
+        lyrics
+        """
         i = 1
         lyrics_str = ""
         for lyric in lyrics:
