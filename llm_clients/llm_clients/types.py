@@ -8,23 +8,23 @@ class TupleContentParam(NamedTuple):
 
 
 class TupleMessageUser(NamedTuple):
-    role: Literal["user"]
     content: str | tuple[TupleContentParam, ...]
+    role: Literal["user"] = "user"
 
 
 class TupleMessageAssistant(NamedTuple):
-    role: Literal["assistant"]
     content: str
+    role: Literal["assistant"] = "assistant"
 
 
 class TupleMessageSystem(NamedTuple):
-    role: Literal["system"]
     content: str
+    role: Literal["system"] = "system"
 
 
 class TupleMessageTool(NamedTuple):
-    role: Literal["tool"]
     content: str
+    role: Literal["tool"] = "tool"
 
 
 TupleMessage = TupleMessageUser | TupleMessageAssistant | TupleMessageSystem | TupleMessageTool
