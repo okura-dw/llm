@@ -1,8 +1,9 @@
-import openai.types.chat
 import pydantic
 import streamlit
 
-import llm_clients
+import llm_clients.gemini
+import llm_clients.openai
+import llm_clients.types
 
 
 class Response(pydantic.BaseModel, frozen=True):
@@ -18,7 +19,7 @@ if __name__ == "__main__":
         match model_name:
             case "OpenAI":
                 model = streamlit.selectbox("model", ["gpt-4o-2024-08-06"])
-                llm = llm_clients.OpenAI(api_key, model)  # type: ignore
+                llm = llm_clients.openai.OpenAI(api_key, model)
             case "Gemini":
                 model = streamlit.selectbox(
                     "model",
@@ -29,19 +30,21 @@ if __name__ == "__main__":
                         "gemini-1.5-flash-8b-exp-0827",
                     ],
                 )
-                llm = llm_clients.Gemini(api_key, model)  # type: ignore
+                llm = llm_clients.gemini.Gemini(api_key, model)
 
             case _:
                 raise ValueError
     response = None
 
     user_message = streamlit.text_area("input")
-    messages: list[openai.types.chat.ChatCompletionMessageParam] = [
-        {"role": "system", "content": "返答には必ず情報源となるURLを添えてください"},
-        {"role": "user", "content": user_message},
+    messages: list[llm_clients.types.TupleMessage] = [
+        llm_clients.types.TupleMessageSystem(
+            role="system", content="返答には必ず情報源となるURLを添えてください"
+        ),
+        llm_clients.types.TupleMessageUser(role="user", content=user_message),
     ]
     if streamlit.button("run"):
-        response = llm.fetch(llm_clients.message2tuple(messages), response_format=Response)
+        response = llm.fetch(tuple(messages), response_format=Response)
     if response is not None:
         print(response)
         streamlit.write(response.message)

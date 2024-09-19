@@ -1,6 +1,7 @@
 from typing import Literal, NamedTuple
 
 
+# キャッシュできるようにタプルでメッセージを持っておく
 class TupleContentParam(NamedTuple):
     type: Literal["text", "image_url"]
     content: str
