@@ -173,12 +173,7 @@ if __name__ == "__main__":
         api_key = streamlit.text_input("API key")
         model = streamlit.selectbox(
             "model",
-            [
-                "gemini-1.5-pro",
-                "gemini-1.5-flash",
-                "gemini-1.5-pro-exp-0827",
-                "gemini-1.5-flash-8b-exp-0827",
-            ],
+            ["gemini-1.5-pro-exp-0827", "gemini-1.5-flash-8b-exp-0827"],
         )
 
         use_vocal = streamlit.checkbox("ボーカル抽出")
