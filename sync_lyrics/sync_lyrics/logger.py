@@ -7,4 +7,4 @@ def get_logger() -> logging.Logger:
         format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s:%(lineno)d: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    return logging.getLogger("vocacolle")
+    return logging.getLogger("sync-lyrics")

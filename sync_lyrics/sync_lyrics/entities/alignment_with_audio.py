@@ -4,7 +4,7 @@ import llm_clients.gemini
 import llm_clients.types
 import pydub
 
-from vocacolle import types
+from sync_lyrics import types
 
 PROMPT = """\
 次の音声データの曲にタイムスタンプを付けて、例のようなSRT形式で出力してください。

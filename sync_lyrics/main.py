@@ -4,8 +4,8 @@ import re
 import llm_clients.types
 import streamlit
 
-import vocacolle
-from vocacolle import entities, types
+import sync_lyrics
+from sync_lyrics import entities, types
 
 ROOT_DIR = "downloads"
 
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     streamlit.set_page_config(layout="wide")
 
     with streamlit.sidebar:
-        logger = vocacolle.get_logger()
+        logger = sync_lyrics.get_logger()
 
         api_key = streamlit.text_input("API key")
         model = streamlit.selectbox(
@@ -178,11 +178,15 @@ if __name__ == "__main__":
 
         use_vocal = streamlit.checkbox("ボーカル抽出")
 
-    content_id = streamlit.selectbox("曲", ["何時か見た無名のレーサー", "消えない夏の香り"])
-    with open(f"{ROOT_DIR}/lyrics/{content_id}.txt") as f:
-        lyrics = f.read()
-    with streamlit.expander("歌詞"):
-        streamlit.code(lyrics)
+    content_id = streamlit.text_input("曲名")
+    try:
+        with open(f"{ROOT_DIR}/lyrics/{content_id}.txt") as f:
+            lyrics = f.read()
+        with streamlit.expander("歌詞"):
+            streamlit.code(lyrics)
+    except:
+        streamlit.warning(f"「{content_id}」の歌詞が、lyrics/ フォルダ以下に見つかりませんでした")
+        lyrics = ""
 
     if streamlit.button("run"):
         _run(api_key, model, content_id, lyrics, use_vocal)
